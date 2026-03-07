@@ -281,6 +281,10 @@ class MainUi(PyQt6.QtWidgets.QMainWindow, base_ui.WidgetUI, base_ui.Communicatio
     def moveEvent(self, event: PyQt6.QtGui.QMoveEvent): #pylint: disable=invalid-name
         """Move all modal dialog when moving main ui."""
         super().moveEvent(event)
+        
+        if not hasattr(self, "errors_dlg"):
+            return
+
         diff = event.pos() - event.oldPos()
 
         list_dialog:List[PyQt6.QtWidgets.QDialog] = [self.errors_dlg, self.effects_monitor_dlg,
