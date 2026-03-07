@@ -525,6 +525,13 @@ class MainUi(PyQt6.QtWidgets.QMainWindow, base_ui.WidgetUI, base_ui.Communicatio
                     self.active_classes[name] = classe
                     self.add_tab(classe, name_axis)
                     self.profile_ui.set_save_btn(True)
+                elif classe_active["id"] == 0x8D or classe_active["id"] == 0x8E:
+                    import rs04_ui
+                    classe = rs04_ui.RS04UI(main=self, unique=classe_active["unique"])
+                    name_axis = classe_active["name"]
+                    self.active_classes[name] = classe
+                    self.add_tab(classe, name_axis)
+                    self.profile_ui.set_save_btn(True)
                 elif classe_active["id"] == 0x5:
                     classe = canremote_ui.CanRemoteUi(main=self)
                     name_axis = classe_active["name"]

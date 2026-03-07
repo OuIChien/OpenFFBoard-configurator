@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>RS04UI</class>
+ <widget class="QWidget" name="RS04UI">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>450</width><height>350</height></rect></property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title"><string>RobStride RS04 Motor Settings</string></property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Communication Protocol:</string></property></widget></item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="comboBox_protocol">
+        <item><property name="text"><string>MIT (Standard Frame)</string></property></item>
+        <item><property name="text"><string>Private (Extended Frame)</string></property></item>
+       </widget>
+      </item>
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Motor CAN ID:</string></property></widget></item>
+      <item row="1" column="1">
+       <widget class="QSpinBox" name="spinBox_canid">
+        <property name="minimum"><number>1</number></property>
+        <property name="maximum"><number>127</number></property>
+       </widget>
+      </item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Max Torque Limit:</string></property></widget></item>
+      <item row="2" column="1">
+       <widget class="QSpinBox" name="spinBox_maxtorque">
+        <property name="maximum"><number>12000</number></property>
+        <property name="singleStep"><number>100</number></property>
+        <property name="suffix"><string> (x0.01 Nm)</string></property>
+       </widget>
+      </item>
+      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Control Mode:</string></property></widget></item>
+      <item row="3" column="1"><widget class="QLabel" name="label_mode_hint"><property name="text"><string>-</string></property></widget></item>
+      <item row="4" column="0"><widget class="QLabel"><property name="text"><string>Link Status:</string></property></widget></item>
+      <item row="4" column="1"><widget class="QLabel" name="label_status"><property name="text"><string>INITIALIZING...</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_warning">
+     <property name="text"><string>WARNING: RS04 peak torque is 120Nm. Use low torque for initial tests.</string></property>
+     <property name="styleSheet"><string>color: #e67e22; font-style: italic;</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="pushButton_refresh">
+     <property name="text"><string>Refresh &amp;&amp; Sync From Motor</string></property>
+    </widget>
+   </item>
+   <item><spacer name="verticalSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+  </layout>
+ </widget>
+</ui>
