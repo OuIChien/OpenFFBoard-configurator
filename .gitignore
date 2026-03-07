@@ -1,5 +1,25 @@
-__pycache__/*
-.vscode/*
-.qt_for_python/*
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE settings
+.vscode/
+.idea/
+.qt_for_python/
+
+# Project specific
 profiles.json*
-/.venv
+build/
+dist/
+*.spec
+
+# OS files
+.DS_Store
+Thumbs.db
