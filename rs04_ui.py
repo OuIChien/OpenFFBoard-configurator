@@ -1,7 +1,10 @@
+import typing
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QMessageBox
 from base_ui import WidgetUI, CommunicationHandler
-import main
+
+if typing.TYPE_CHECKING:
+    import main
 
 class RS04UI(WidgetUI, CommunicationHandler):
     def __init__(self, main: 'main.MainUi'=None, unique=0):
