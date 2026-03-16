@@ -24,7 +24,7 @@ class SerialChooser(base_ui.WidgetUI, base_ui.CommunicationHandler):
     *) Manage the serial port status
     """
 
-    OFFICIAL_VID_PID = [(0x1209, 0xFFB0)]  # Highlighted in serial selector
+    OFFICIAL_VID_PID = [(0x1209, 0xFFB0), (0x0483, 0x5740)]  # Highlighted in serial selector
     connected = PyQt6.QtCore.pyqtSignal(bool)
     shown = PyQt6.QtCore.pyqtSignal()
     hidden = PyQt6.QtCore.pyqtSignal()
@@ -128,7 +128,7 @@ class SerialChooser(base_ui.WidgetUI, base_ui.CommunicationHandler):
             self._serial.setBaudRate(115200)
             self._serial.open(PyQt6.QtCore.QIODevice.OpenModeFlag.ReadWrite)
             if not self._serial.isOpen():
-                self.main.log("Can not open port")
+                self.main.log(f"Can not open port: {self._serial.errorString()}")
             else:
                 self._serial.setDataTerminalReady(True)
 
@@ -140,62 +140,24 @@ class SerialChooser(base_ui.WidgetUI, base_ui.CommunicationHandler):
             self._port = None
 
     def get_ports(self):
-        """Get all the serial port available on the computer.
-
-        If the VID.VIP is compatible with openFFBoard color the text in green,
-        else put it in red.
-        """
-        oldport = self._port if self._port else None
-
+        """Get all the serial port available on the computer."""
         self._ports = PyQt6.QtSerialPort.QSerialPortInfo().availablePorts()
         self.comboBox_port.clear()
-        sel_idx = 0
-        nb_compatible_device = 0
+        
+        print(f"--- Debug: Found {len(self._ports)} ports ---")
         for i, port in enumerate(self._ports):
-            supported_vid_pid = (
-                port.vendorIdentifier(),
-                port.productIdentifier(),
-            ) in self.OFFICIAL_VID_PID
-            name = port.portName() + " : " + port.description()
-
-            if supported_vid_pid and not name.startswith("cu."):
-                name += " (FFBoard device)"
-            else:
-                name += " (Unsupported device)"
+            name = f"{port.portName()} (VID:0x{port.vendorIdentifier():04x})"
+            print(f"Port: {name}, Desc: {port.description()}")
             self.comboBox_port.addItem(name)
+            # Default to green for testing
+            self.comboBox_port.setItemData(i, PyQt6.QtGui.QColor("green"), PyQt6.QtCore.Qt.ItemDataRole.ForegroundRole)
 
-            if supported_vid_pid and not name.startswith("cu."):
-                sel_idx = i
-                nb_compatible_device = nb_compatible_device + 1
-                self.comboBox_port.setItemData(
-                    i,
-                    PyQt6.QtGui.QColor("green"),
-                    PyQt6.QtCore.Qt.ItemDataRole.ForegroundRole,
-                )
-            else:
-                self.comboBox_port.setItemData(
-                    i,
-                    PyQt6.QtGui.QColor("red"),
-                    PyQt6.QtCore.Qt.ItemDataRole.ForegroundRole,
-                )
-
-        plist = [p.portName() for p in self._ports]
-        if (
-            (oldport is not None)
-            and (
-                (oldport.vendorIdentifier(), oldport.productIdentifier())
-                in self.OFFICIAL_VID_PID
-            )
-            and (oldport.portName() in plist)
-        ):
-            self.comboBox_port.setCurrentIndex(plist.index(oldport.portName()))
-        else:
-            self.comboBox_port.setCurrentIndex(sel_idx)  # preselect found entry
-
+        if len(self._ports) > 0:
+            self.comboBox_port.setCurrentIndex(0)
+        
         self.select_port(self.comboBox_port.currentIndex())
         self.update()
-
-        return nb_compatible_device
+        return len(self._ports)
     
     def auto_connect(self, nb_compatible_device):
         if (nb_compatible_device == 1) :

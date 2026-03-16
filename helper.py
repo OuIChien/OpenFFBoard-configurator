@@ -71,20 +71,36 @@ def qtBlockAndCall(object : QObject,function,value):
     object.blockSignals(False)
 
 def throttle(ms):
-
-    time_of_last_call = time.time()
-    timer = QTimer()
-    timer.setSingleShot(True)
-
+    """
+    Decorator that throttles the execution of a function.
+    The function will be called immediately if enough time has passed since the last call.
+    Otherwise, it will be delayed until the timeout expires.
+    """
     def decorator(fn):
+        # We store the timer and last call time in the closure of the decorator
+        # But we must ensure the timer is created after QApplication is initialized.
+        @wraps(fn)
         def wrapper(*args, **kwargs):
+            # Try to get or create a timer for this specific instance (if it's a method)
+            # or a global one if it's a regular function.
+            instance = args[0] if args and isinstance(args[0], QObject) else fn
+            timer_attr = f"_throttle_timer_{fn.__name__}"
+            
+            if not hasattr(instance, timer_attr):
+                timer = QTimer(instance if isinstance(instance, QObject) else None)
+                timer.setSingleShot(True)
+                setattr(instance, timer_attr, timer)
+                setattr(instance, f"_throttle_last_call_{fn.__name__}", 0)
+            
+            timer = getattr(instance, timer_attr)
+            
             def call():
-                nonlocal time_of_last_call 
-                time_of_last_call = time.time()
+                setattr(instance, f"_throttle_last_call_{fn.__name__}", time.time())
                 fn(*args, **kwargs)
             
             now = time.time()
-            time_since_last_call = now - time_of_last_call
+            last_call = getattr(instance, f"_throttle_last_call_{fn.__name__}")
+            time_since_last_call = now - last_call
 
             # Call immediately if last call is older than timeout
             if time_since_last_call > ms/1000:

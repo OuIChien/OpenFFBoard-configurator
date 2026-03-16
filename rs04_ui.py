@@ -27,8 +27,35 @@ class RS04UI(WidgetUI, CommunicationHandler):
         self.register_callback("rs04", "canid", self.canIdChangedCallback, self.instance, int)
         self.register_callback("rs04", "maxtorque", self.maxTorqueChangedCallback, self.instance, int)
         self.register_callback("rs04", "connected", self.updateConnectedStatus, self.instance, int)
+        self.register_callback("rs04", "rawcan", self.updateRawCan, self.instance, int)
+        self.register_callback("rs04", "lasterr", self.updateLastError, self.instance, int)
+        self.register_callback("rs04", "version", self.updateVersion, self.instance, str)
+        self.register_callback("rs04", "faultbits", self.updateFaultBits, self.instance, int)
 
         self.log("RS04 UI Initialized.")
+        
+        # Add dynamic debug labels and Save button
+        from PyQt6.QtWidgets import QLabel, QPushButton, QHBoxLayout
+        
+        self.label_version = QLabel("Motor Version: Requesting...")
+        self.label_raw_id = QLabel("Last Raw CAN ID: 0x00000000")
+        self.label_last_error = QLabel("Rejection Reason: None")
+        self.label_faults = QLabel("Motor Faults: None")
+        self.label_faults.setWordWrap(True)
+        self.label_faults.setStyleSheet("color: #27ae60; font-weight: bold;")
+        
+        self.pushButton_save = QPushButton("SAVE PARAMETERS TO MOTOR")
+        self.pushButton_save.setStyleSheet("background-color: #e67e22; color: white; font-weight: bold;")
+        self.pushButton_save.clicked.connect(self.saveMotorParams)
+        
+        # Insert before logs
+        idx = self.verticalLayout.indexOf(self.label_log_title)
+        self.verticalLayout.insertWidget(idx, self.label_version)
+        self.verticalLayout.insertWidget(idx+1, self.label_raw_id)
+        self.verticalLayout.insertWidget(idx+2, self.label_last_error)
+        self.verticalLayout.insertWidget(idx+3, self.label_faults)
+        self.verticalLayout.insertWidget(idx+4, self.pushButton_save)
+        
         self.refreshParams()
 
     def log(self, message):
@@ -36,7 +63,47 @@ class RS04UI(WidgetUI, CommunicationHandler):
 
     def refreshParams(self):
         self.log("Requesting parameters from motor...")
-        self.send_commands("rs04", ["protocol", "canid", "maxtorque", "connected"], self.instance)
+        self.send_commands("rs04", ["protocol", "canid", "maxtorque", "connected", "version"], self.instance)
+
+    def saveMotorParams(self):
+        ret = QMessageBox.question(self, "Save to Motor", "This will permanently save current settings (CAN ID, Protocol, etc.) to the motor's internal EEPROM. Continue?", 
+                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if ret == QMessageBox.StandardButton.Yes:
+            self.send_value("rs04", "savemotor", 1, instance=self.instance)
+            self.log("Save command sent to motor.")
+
+    def updateVersion(self, version):
+        self.label_version.setText(f"Motor Version: {version}")
+        self._last_version = version
+
+    def updateFaultBits(self, val):
+        if val == 0:
+            self.label_faults.setText("Motor Faults: None (System Normal)")
+            self.label_faults.setStyleSheet("color: #27ae60; font-weight: bold;")
+            return
+
+        faults = []
+        mapping = {
+            0: "Over-temperature",
+            1: "Driver chip fault",
+            2: "Undervoltage",
+            3: "Overvoltage",
+            4: "Phase B sensor fault",
+            5: "Phase C sensor fault",
+            7: "Encoder not calibrated",
+            8: "Hardware identify err",
+            9: "Pos init err",
+            14: "Stall protection",
+            16: "Phase A sensor fault"
+        }
+        for bit, msg in mapping.items():
+            if val & (1 << bit):
+                faults.append(msg)
+        
+        err_str = ", ".join(faults) if faults else f"Unknown ({hex(val)})"
+        self.label_faults.setText(f"Motor Faults: {err_str}")
+        self.label_faults.setStyleSheet("color: #c0392b; font-weight: bold;")
+        self.log(f"CRITICAL: Motor reported faults: {err_str}")
 
     def updateProtocolUI(self, val):
         self.comboBox_protocol.blockSignals(True)
@@ -79,13 +146,29 @@ class RS04UI(WidgetUI, CommunicationHandler):
             self.log(f"Connection state changed: {'Connected' if connected else 'Disconnected'}")
             self._last_conn = connected
 
+    def updateRawCan(self, val):
+        if hasattr(self, "label_raw_id"):
+            self.label_raw_id.setText(f"Last Raw CAN ID: 0x{val:08X}")
+
+    def updateLastError(self, val):
+        err_map = {
+            0: "No Error",
+            1: "Wrong MotorID (Private Mode)",
+            2: "Wrong Msg Type (Private Mode)",
+            3: "Wrong MasterID (MIT Mode)",
+            4: "Wrong MotorID (MIT Mode)"
+        }
+        err_msg = err_map.get(val, f"Unknown Error ({val})")
+        if hasattr(self, "label_last_error"):
+            self.label_last_error.setText(f"Rejection Reason: {err_msg}")
+
     def updateStatus(self):
-        # 仅查询连接状态
-        self.send_command("rs04", "connected", self.instance, typechar='?')
+        # Query status, debug info and version periodically
+        self.send_commands("rs04", ["connected", "rawcan", "lasterr", "faultbits"], self.instance)
 
     def showEvent(self, event):
         self.refreshParams()
-        self.timer.start(1000)
+        self.timer.start(250) # 4Hz refresh for debugging
 
     def hideEvent(self, event):
         self.timer.stop()
