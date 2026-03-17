@@ -13,6 +13,7 @@ class RS04UI(WidgetUI, CommunicationHandler):
         self.main = main
         self.instance = unique
         self.timer = QTimer(self)
+        self._last_fault_val = 0
 
         # 绑定 UI 控件
         self.comboBox_protocol.currentIndexChanged.connect(self.protocolChanged)
@@ -44,6 +45,24 @@ class RS04UI(WidgetUI, CommunicationHandler):
         self.label_faults.setWordWrap(True)
         self.label_faults.setStyleSheet("color: #27ae60; font-weight: bold;")
         
+        # Debug Buttons
+        debug_layout = QHBoxLayout()
+        self.pushButton_enable = QPushButton("ENABLE")
+        self.pushButton_enable.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; height: 30px;")
+        self.pushButton_enable.clicked.connect(lambda: self.send_value("rs04", "enable", 1, instance=self.instance))
+        
+        self.pushButton_stop = QPushButton("STOP / CLEAR FAULT")
+        self.pushButton_stop.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold; height: 30px;")
+        self.pushButton_stop.clicked.connect(lambda: self.send_value("rs04", "stop", 1, instance=self.instance))
+        
+        self.pushButton_setzero = QPushButton("SET ZERO")
+        self.pushButton_setzero.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; height: 30px;")
+        self.pushButton_setzero.clicked.connect(self.setZeroPosition)
+        
+        debug_layout.addWidget(self.pushButton_enable)
+        debug_layout.addWidget(self.pushButton_stop)
+        debug_layout.addWidget(self.pushButton_setzero)
+
         self.pushButton_save = QPushButton("SAVE PARAMETERS TO MOTOR")
         self.pushButton_save.setStyleSheet("background-color: #e67e22; color: white; font-weight: bold;")
         self.pushButton_save.clicked.connect(self.saveMotorParams)
@@ -54,12 +73,20 @@ class RS04UI(WidgetUI, CommunicationHandler):
         self.verticalLayout.insertWidget(idx+1, self.label_raw_id)
         self.verticalLayout.insertWidget(idx+2, self.label_last_error)
         self.verticalLayout.insertWidget(idx+3, self.label_faults)
-        self.verticalLayout.insertWidget(idx+4, self.pushButton_save)
+        self.verticalLayout.insertLayout(idx+4, debug_layout)
+        self.verticalLayout.insertWidget(idx+5, self.pushButton_save)
         
         self.refreshParams()
 
     def log(self, message):
         self.textEdit_log.appendPlainText(message)
+
+    def setZeroPosition(self):
+        ret = QMessageBox.warning(self, "Set Mechanical Zero", "This will set current position as 0 rad. Ensure motor is in safe position. Continue?", 
+                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if ret == QMessageBox.StandardButton.Yes:
+            self.send_value("rs04", "setzero", 1, instance=self.instance)
+            self.log("Set Zero command sent.")
 
     def refreshParams(self):
         self.log("Requesting parameters from motor...")
@@ -77,9 +104,18 @@ class RS04UI(WidgetUI, CommunicationHandler):
         self._last_version = version
 
     def updateFaultBits(self, val):
+        if not hasattr(self, "_last_fault_val"):
+            self._last_fault_val = 0
+
+        # Only log if fault status changed
+        if val == self._last_fault_val:
+            return
+
         if val == 0:
             self.label_faults.setText("Motor Faults: None (System Normal)")
             self.label_faults.setStyleSheet("color: #27ae60; font-weight: bold;")
+            self.log("INFO: Motor fault cleared. System is now normal.")
+            self._last_fault_val = 0
             return
 
         faults = []
@@ -104,6 +140,7 @@ class RS04UI(WidgetUI, CommunicationHandler):
         self.label_faults.setText(f"Motor Faults: {err_str}")
         self.label_faults.setStyleSheet("color: #c0392b; font-weight: bold;")
         self.log(f"CRITICAL: Motor reported faults: {err_str}")
+        self._last_fault_val = val
 
     def updateProtocolUI(self, val):
         self.comboBox_protocol.blockSignals(True)
