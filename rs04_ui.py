@@ -32,6 +32,7 @@ class RS04UI(WidgetUI, CommunicationHandler):
         self.register_callback("rs04", "lasterr", self.updateLastError, self.instance, int)
         self.register_callback("rs04", "version", self.updateVersion, self.instance, str)
         self.register_callback("rs04", "faultbits", self.updateFaultBits, self.instance, int)
+        self.register_callback("rs04", "damper", self.updateDamperUI, self.instance, int)
 
         self.log("RS04 UI Initialized.")
         
@@ -45,15 +46,21 @@ class RS04UI(WidgetUI, CommunicationHandler):
         self.label_faults.setWordWrap(True)
         self.label_faults.setStyleSheet("color: #27ae60; font-weight: bold;")
         
+        # Damper Control
+        from PyQt6.QtWidgets import QCheckBox
+        self.checkBox_damper = QCheckBox("Disable Drag Protection (Damper)")
+        self.checkBox_damper.setToolTip("Sets motor parameter 0x2028. Prevents motor from braking when unpowered/stopped.")
+        self.checkBox_damper.stateChanged.connect(self.damperChanged)
+        
         # Debug Buttons
         debug_layout = QHBoxLayout()
         self.pushButton_enable = QPushButton("ENABLE")
         self.pushButton_enable.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; height: 30px;")
-        self.pushButton_enable.clicked.connect(lambda: self.send_value("rs04", "enable", 1, instance=self.instance))
+        self.pushButton_enable.clicked.connect(self.enableMotor)
         
         self.pushButton_stop = QPushButton("STOP / CLEAR FAULT")
         self.pushButton_stop.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold; height: 30px;")
-        self.pushButton_stop.clicked.connect(lambda: self.send_value("rs04", "stop", 1, instance=self.instance))
+        self.pushButton_stop.clicked.connect(self.stopMotor)
         
         self.pushButton_setzero = QPushButton("SET ZERO")
         self.pushButton_setzero.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; height: 30px;")
@@ -73,13 +80,27 @@ class RS04UI(WidgetUI, CommunicationHandler):
         self.verticalLayout.insertWidget(idx+1, self.label_raw_id)
         self.verticalLayout.insertWidget(idx+2, self.label_last_error)
         self.verticalLayout.insertWidget(idx+3, self.label_faults)
-        self.verticalLayout.insertLayout(idx+4, debug_layout)
-        self.verticalLayout.insertWidget(idx+5, self.pushButton_save)
+        self.verticalLayout.insertWidget(idx+4, self.checkBox_damper)
+        self.verticalLayout.insertLayout(idx+5, debug_layout)
+        self.verticalLayout.insertWidget(idx+6, self.pushButton_save)
         
         self.refreshParams()
 
     def log(self, message):
         self.textEdit_log.appendPlainText(message)
+
+    def damperChanged(self, state):
+        val = 1 if state == 2 else 0 
+        self.send_value("rs04", "damper", val, instance=self.instance)
+        self.log(f"Drag Protection {'Disabled' if val else 'Enabled'} command sent.")
+
+    def enableMotor(self):
+        self.send_value("rs04", "enable", 1, instance=self.instance)
+        self.log("Enable command sent.")
+
+    def stopMotor(self):
+        self.send_value("rs04", "stop", 1, instance=self.instance)
+        self.log("Stop / Clear Fault command sent.")
 
     def setZeroPosition(self):
         ret = QMessageBox.warning(self, "Set Mechanical Zero", "This will set current position as 0 rad. Ensure motor is in safe position. Continue?", 
@@ -90,7 +111,7 @@ class RS04UI(WidgetUI, CommunicationHandler):
 
     def refreshParams(self):
         self.log("Requesting parameters from motor...")
-        self.send_commands("rs04", ["protocol", "canid", "maxtorque", "connected", "version"], self.instance)
+        self.send_commands("rs04", ["protocol", "canid", "maxtorque", "connected", "version", "damper"], self.instance)
 
     def saveMotorParams(self):
         ret = QMessageBox.question(self, "Save to Motor", "This will permanently save current settings (CAN ID, Protocol, etc.) to the motor's internal EEPROM. Continue?", 
@@ -102,6 +123,11 @@ class RS04UI(WidgetUI, CommunicationHandler):
     def updateVersion(self, version):
         self.label_version.setText(f"Motor Version: {version}")
         self._last_version = version
+
+    def updateDamperUI(self, val):
+        self.checkBox_damper.blockSignals(True)
+        self.checkBox_damper.setChecked(val == 1)
+        self.checkBox_damper.blockSignals(False)
 
     def updateFaultBits(self, val):
         if not hasattr(self, "_last_fault_val"):
